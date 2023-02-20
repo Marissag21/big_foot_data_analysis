@@ -7,7 +7,7 @@
 // Populate dropdown
 
 
-// Get data for selected entry
+// Get data for selected state
 
 
 // Update visualizations
@@ -41,9 +41,20 @@
   
   // Get the data with d3.
   d3.json(url).then(function(response) {
-  
+
+    console.log(response);
+
     // Create a new marker cluster group.
     var markers = L.markerClusterGroup();
+
+    var borough = L.markerClusterGroup();
+
+    var boroughChoice = "STATEN ISLAND";
+
+    var boroughLat = [];
+    var boroughLng = [];
+
+    var locations = [];
   
     // Loop through the data.
     for (var i = 0; i < response.length; i++) {
@@ -57,11 +68,34 @@
         // Add a new marker to the cluster group, and bind a popup.
         markers.addLayer(L.marker([location.coordinates[1], location.coordinates[0]])
           .bindPopup(response[i].descriptor));
+
+        if(response[i].borough === boroughChoice) {
+            borough.addLayer(L.marker([location.coordinates[1], location.coordinates[0]])
+            .bindPopup(response[i].descriptor));
+            boroughLat.push(location.coordinates[1]);
+            boroughLng.push(location.coordinates[0]);
+        }
+      }
+
+      if (!locations.includes(response[i].borough)) {
+        locations.push(response[i].borough);
       }
   
     }
+
+    console.log(locations);
+
+    // Populate dropdown menu
+    let dropdown = d3.select("#selDataset");
+    for (i=0; i<locations.length; i++) {
+        dropdown.append("option").attr("value", i).text(locations[i]);
+    }
   
     // Add our marker cluster layer to the map.
-    myMap.addLayer(markers);
+    const average = array => array.reduce((a, b) => a + b) / array.length;
+
+    myMap.addLayer(borough);
+    let latlng = [average(boroughLat), average(boroughLng)];
+    myMap.setView(latlng, myMap.getZoom(), { animation: true });
   
   });
