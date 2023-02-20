@@ -19,9 +19,15 @@
 
 // Creating the map object
   var myMap = L.map("bubble", {
-    center: [40.7, -73.95],
+    //center: [40.7, -73.95],
     zoom: 11
   });
+
+  var scopeTest = [];
+
+  var markerObject = {};
+
+  var currentLocation = "STATEN ISLAND";
   
   // Adding the tile layer
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -40,9 +46,13 @@
   var url = baseURL + date + complaint + limit;
   
   // Get the data with d3.
-  d3.json(url).then(function(response) {
+  dataPromise = d3.json(url);
+  dataPromise.then(function(response) {
 
     console.log(response);
+
+    scopeTest.push("scopetest tested");
+    console.log(scopeTest);
 
     // Create a new marker cluster group.
     var markers = L.markerClusterGroup();
@@ -57,6 +67,75 @@
     var locations = [];
   
     // Loop through the data.
+    for (var i = 0; i < response.length; i++) {
+        if (!locations.includes(response[i].borough)) {
+            locations.push(response[i].borough);
+            markerObject[response[i].borough] = L.markerClusterGroup();
+          }
+  
+      // Set the data location property to a variable.
+      var location = response[i].location;
+  
+      // Check for the location property.
+      if (location) {
+  
+        // Add a new marker to the cluster group, and bind a popup.
+        markers.addLayer(L.marker([location.coordinates[1], location.coordinates[0]])
+          .bindPopup(response[i].descriptor));
+
+        markerObject[response[i].borough].addLayer(L.marker([location.coordinates[1], location.coordinates[0]])
+        .bindPopup(response[i].descriptor));
+
+        if(response[i].borough === boroughChoice) {
+            borough.addLayer(L.marker([location.coordinates[1], location.coordinates[0]])
+            .bindPopup(response[i].descriptor));
+            boroughLat.push(location.coordinates[1]);
+            boroughLng.push(location.coordinates[0]);
+        }
+      }
+
+      
+  
+    }
+
+    console.log(locations);
+
+    console.log(markerObject);
+
+    // Populate dropdown menu
+    let dropdown = d3.select("#selDataset");
+    for (i=0; i<locations.length; i++) {
+        dropdown.append("option").attr("value", locations[i]).text(locations[i]);
+    }
+  
+    // Add our marker cluster layer to the map.
+    const average = array => array.reduce((a, b) => a + b) / array.length;
+
+    myMap.addLayer(markerObject["STATEN ISLAND"]);
+    let latlng = [average(boroughLat), average(boroughLng)];
+    myMap.setView(latlng, myMap.getZoom(), { animation: true });
+  
+  });
+
+  function optionChanged(id) {
+    dataPromise.then((response) => {
+        console.log(id);
+        var markers = L.markerClusterGroup();
+
+
+    scopeTest.push(id);
+    console.log(scopeTest);
+
+    //var borough = L.markerClusterGroup();
+
+    var boroughChoice = id;
+
+    var boroughLat = [];
+    var boroughLng = [];
+
+    var locations = [];
+  
+    /*// Loop through the data.
     for (var i = 0; i < response.length; i++) {
   
       // Set the data location property to a variable.
@@ -81,21 +160,17 @@
         locations.push(response[i].borough);
       }
   
-    }
+    }*/
 
-    console.log(locations);
+    //const average = array => array.reduce((a, b) => a + b) / array.length;
 
-    // Populate dropdown menu
-    let dropdown = d3.select("#selDataset");
-    for (i=0; i<locations.length; i++) {
-        dropdown.append("option").attr("value", i).text(locations[i]);
-    }
-  
-    // Add our marker cluster layer to the map.
-    const average = array => array.reduce((a, b) => a + b) / array.length;
+    myMap.removeLayer(markerObject[currentLocation]);
+    currentLocation = id;
+    console.log(markerObject[id].getBounds());
 
-    myMap.addLayer(borough);
-    let latlng = [average(boroughLat), average(boroughLng)];
-    myMap.setView(latlng, myMap.getZoom(), { animation: true });
-  
-  });
+    myMap.addLayer(markerObject[id]);
+    //let latlng = [average(boroughLat), average(boroughLng)];
+    //myMap.setView(latlng, myMap.getZoom(), { animation: true });
+    myMap.fitBounds(markerObject[id].getBounds());
+    });
+}
