@@ -25,7 +25,7 @@ def home():
 def data():
      cursor.execute('SELECT * FROM bigfoot')
      data = (cursor.fetchall())
-     data = pd.DataFrame(data, columns = ["Index", "Number", "County", "State", "Latitude", "Longitude", "Classification", "Date", "Season", "Temperature", "Humidity", "Cloud_cover", "Precip_intensity", "Visibility", "Pressure", "Wind_speed", "Observed"])
+     data = pd.DataFrame(data, columns = ["Number", "County", "State", "Latitude", "Longitude", "Classification", "Date", "Season", "Temperature", "Humidity", "Cloud_cover", "Precip_intensity", "Visibility", "Pressure", "Wind_speed", "Observed"])
      data = data.to_json(orient = "records")
      return render_template('data.html', jsondata = data)
 
