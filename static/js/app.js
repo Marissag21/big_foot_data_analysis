@@ -1,34 +1,23 @@
-let myMap = L.map("map");
-let stateData = {};
+const metadataPanel = d3.select("#state-metadata");
+const fieldsToAverage = ["Latitude", "Longitude"]; // TODO: match JSON
+const dropdown = d3.select("#selDataset");
 const defaultChoice = "ALL STATES"; // TODO: match caps
 let prevState = defaultChoice;
-const dropdown = d3.select("#selDataset");
-const metadataPanel = d3.select("#sample-metadata");
-const fieldsToAverage = ["Latitude", "Longitude"]; // TODO: match JSON
+let stateData = {};
+let myMap = L.map("map");
   
 // Adding the tile layer
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
 }).addTo(myMap);
-  
-// Store the API query variables
-// For docs, refer to https://dev.socrata.com/docs/queries/where.html
-// And, refer to https://dev.socrata.com/foundry/data.cityofnewyork.us/erm2-nwe9
-const baseURL = "https://data.cityofnewyork.us/resource/fhrw-4uyv.json?";
-const date = "$where=created_date between'2016-01-01T00:00:00' and '2017-01-01T00:00:00'";
-const complaint = "&complaint_type=Rodent";
-const limit = "&$limit=10000";
-  
-// Assemble the API query URL
-const url = baseURL + date + complaint + limit;
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // query API, perform initial setup
-d3.json(url).then(function(response) { // TODO: change to fetch(url)
+fetch("/data").then((response) => response.json()).then(function(response) {
     newState(defaultChoice);
 
-    console.log(response[0]); // debug
+    console.log(response); // debug
   
     // Loop through the data
     for (const report of response) {
