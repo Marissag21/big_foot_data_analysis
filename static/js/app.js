@@ -1,4 +1,4 @@
-let myMap = L.map("bubble"); // TODO: change div id
+let myMap = L.map("map");
 let stateData = {};
 const defaultChoice = "ALL STATES"; // TODO: match caps
 let prevState = defaultChoice;
@@ -171,7 +171,7 @@ function optionChanged(state) {
             }
         }
     }
-    Plotly.newPlot("bar", stateData[state].bar, barLayout); // TODO: change div id
+    Plotly.newPlot("bar", stateData[state].bar, barLayout);
 
     // Line chart
     let lineLayout = {
@@ -192,7 +192,7 @@ function optionChanged(state) {
             }
         }
     }
-    Plotly.newPlot("gauge", stateData[state].line, lineLayout); // TODO: change div id
+    Plotly.newPlot("line", stateData[state].line, lineLayout);
 
     // Metadata
     for (const [key, value] of Object.entries(stateData[state].metadata)) {
