@@ -1,12 +1,12 @@
 const metadataPanel = d3.select("#state-metadata");
 const fieldUnits = {
-    "Humidity": "humidity unit",
-    "Pressure": "pressure unit",
-    "Temperature": "°F",
-    "Cloud_cover": "",
-    "Precip_intensity": "inches per hour",
-    "Visibility": "miles",
-    "Wind_speed": "mph"};
+    "Temperature": " °F",
+    "Precip_intensity": " in/hr",
+    "Wind_speed": " mph",
+    "Humidity": "%",
+    "Cloud_cover": "%",
+    "Visibility": " miles",
+    "Pressure": " hPa"};
 const fieldList = Object.keys(fieldUnits);
 const dropdown = d3.select("#selDataset");
 const defaultChoice = "All States";
@@ -44,6 +44,7 @@ fetch("/data").then((response) => response.json()).then(function(response) {
 
     // Give each location chart data and dropdown entry, calculate averages
     for (const state of stateList) {
+        if (stateData[state].seasonCounts.Unknown) delete stateData[state].seasonCounts.Unknown; // TODO: remove if new JSON doesn't need this
         stateData[state].bar[0].x = Object.keys(stateData[state].seasonCounts);
         stateData[state].bar[0].y = Object.values(stateData[state].seasonCounts);
 
@@ -52,25 +53,26 @@ fetch("/data").then((response) => response.json()).then(function(response) {
 
         dropdown.append("option").attr("value", state).text(state);
 
-        for (const field of fieldList) {
-            metadataAverage(state, field);
-        }
+        for (const field of fieldList) calcAverages(state, field);
+        stateData[state].fieldAverages.Cloud_cover = Math.round(stateData[state].fieldAverages.Cloud_cover * 100); // TODO: remove if new JSON doesn't need this
+        stateData[state].fieldAverages.Humidity = Math.round(stateData[state].fieldAverages.Humidity * 100); // TODO: remove if new JSON doesn't need this
+
+        countyMax(state);
     }
 
     // Initialize graphics with first item in dropdown menu
     optionChanged(dropdown.select("option").attr("value"));
 });
 
-// Get average of recorded total
-function metadataAverage(state, field) {
-    let avgFieldName = "Avg " + field;
-    stateData[state].metadata[avgFieldName] = Math.round(stateData[state].totals[field] / stateData[state].counts[field] * 100) / 100;
+// Get average of recorded total, to two decimal places
+function calcAverages(state, field) {
+    stateData[state].fieldAverages[field] = Math.round(stateData[state].fieldTotals[field] / stateData[state].fieldCounts[field] * 100) / 100;
 }
 
 // Add given value to total for given field
 function accumulateValue(state, field, addend) {
-    stateData[state].totals[field] += addend;
-    stateData[state].counts[field]++;
+    stateData[state].fieldTotals[field] += addend;
+    stateData[state].fieldCounts[field]++;
 }
 
 // Add new marker
@@ -82,6 +84,7 @@ function addMarker(report, state = defaultChoice) {
     let date = report.Date;
     let year = date.substring(0,4);
     let season = report.Season;
+    let county = report.County;
 
     // Add marker to markerClusterGroup
     stateData[state].markers.addLayer(L.marker([lat, long])
@@ -90,7 +93,8 @@ function addMarker(report, state = defaultChoice) {
     // Count sighting in relevant fields
     countSighting(state, "yearCounts", year);
     countSighting(state, "seasonCounts", season);
-    stateData[state].metadata["Total Sightings"]++;
+    countSighting(state, "countyCounts", county);
+    stateData[state].totalSightings++;
 
     for (const field of fieldList) {
         accumulateValue(state, field, Number(report[field]));
@@ -105,6 +109,16 @@ function countSighting(state, field, subfield) {
     stateData[state][field][subfield]++;
 }
 
+// Get an array of counties with the highest number of Bigfoot sightings
+// Source: https://stackoverflow.com/a/47934466/20258097
+function countyMax(state) {
+    let countyList = stateData[state].countyCounts;
+    stateData[state].densestCounties = Object.keys(countyList).filter(x => {
+         return countyList[x] == Math.max.apply(null, 
+         Object.values(countyList));
+   });
+};
+
 // Set up new state with markers, metadata, etc.
 function newState(state) {
     stateData[state] = {
@@ -116,11 +130,12 @@ function newState(state) {
             "Fall": 0,
             "Winter": 0
         },
-        totals: {},
-        counts: {},
-        metadata: {
-            ["Total Sightings"]: 0
-        },
+        countyCounts: {},
+        fieldTotals: {},
+        fieldCounts: {},
+        totalSightings: 0,
+        densestCounties: [],
+        fieldAverages: {},
         bar: [{
             type: "bar",
             x: [],
@@ -133,8 +148,8 @@ function newState(state) {
     }
 
     for (const field of fieldList) {
-        stateData[state].totals[field] = 0;
-        stateData[state].counts[field] = 0;
+        stateData[state].fieldTotals[field] = 0;
+        stateData[state].fieldCounts[field] = 0;
     }
 }
 
@@ -195,14 +210,37 @@ function optionChanged(state) {
     Plotly.newPlot("line", stateData[state].line, lineLayout);
 
     // Metadata
-    for (const [key, value] of Object.entries(stateData[state].metadata)) {
-        let field = key.substring(4);
-        let unit = "";
-        if (fieldUnits[field]) unit = fieldUnits[field];
+    let metaTotal = metadataPanel.append("div");
+    metaTotal.append("b").text("Total Sightings: ");
+    metaTotal.append().text(stateData[state].totalSightings);
+
+    // Most visited county
+    if (stateData[state].countyCounts[stateData[state].densestCounties[0]] === 1) {
+        metadataPanel.append("div").append("b").text("No more than one visit per county");
+    } else {
+        let metaDense = metadataPanel.append("div");
+        if (stateData[state].densestCounties.length === 1) {
+            metaDense.append("b").text("Most Visited County ");
+            metaDense.append().text(`(${stateData[state].countyCounts[stateData[state].densestCounties[0]]} visits)`);
+        } else {
+            metaDense.append("b").text("Most Visited Counties ");
+            metaDense.append().text(`(${stateData[state].countyCounts[stateData[state].densestCounties[0]]} visits each)`);
+        }
+        metaDense.append("b").text(":");
+        let countyEntries = metaDense.append("ul");
+        for (const county of stateData[state].densestCounties) countyEntries.append("li").text(county);
+    }
+
+    // Averages
+    let avgList = metadataPanel.append("div");
+    avgList.append("b").text("Averages:");
+    let avgEntries = avgList.append("ul")
+    for (const [key, value] of Object.entries(stateData[state].fieldAverages)) {
+        let unit = fieldUnits[key];
         if (value) {
-            let stat = metadataPanel.append("div");
+            let stat = avgEntries.append("li");
             stat.append("b").text(`${key}: `);
-            stat.append().text(`${value} ${unit}`);
+            stat.append().text(`${value}${unit}`);
         }
     }
 }
