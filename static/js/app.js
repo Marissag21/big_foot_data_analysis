@@ -1,7 +1,15 @@
 const metadataPanel = d3.select("#state-metadata");
-const fieldsToAverage = ["Latitude", "Longitude"]; // TODO: match JSON
+const fieldUnits = {
+    "Humidity": "humidity unit",
+    "Pressure": "pressure unit",
+    "Temperature": "°F",
+    "Cloud_cover": "",
+    "Precip_intensity": "inches per hour",
+    "Visibility": "miles",
+    "Wind_speed": "mph"};
+const fieldList = Object.keys(fieldUnits);
 const dropdown = d3.select("#selDataset");
-const defaultChoice = "ALL STATES"; // TODO: match caps
+const defaultChoice = "All States";
 let prevState = defaultChoice;
 let stateData = {};
 let myMap = L.map("map");
@@ -17,16 +25,16 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 fetch("/data").then((response) => response.json()).then(function(response) {
     newState(defaultChoice);
 
-    console.log(response); // debug
+    console.log(response[0]); // debug
   
     // Loop through the data
     for (const report of response) {
-        let state = report.borough; // TODO: match JSON
+        let state = report.State;
   
         // Only mark reports with useful info
-        if (report.location && report.descriptor) { // TODO: match JSON
+        if (report.Latitude && report.Longitude && report.Observed) {
             if (!stateData[state]) newState(state);
-            addMarker(report); // TODO: match JSON
+            addMarker(report);
         }
     }
 
@@ -44,7 +52,7 @@ fetch("/data").then((response) => response.json()).then(function(response) {
 
         dropdown.append("option").attr("value", state).text(state);
 
-        for (const field of fieldsToAverage) {
+        for (const field of fieldList) {
             metadataAverage(state, field);
         }
     }
@@ -55,7 +63,7 @@ fetch("/data").then((response) => response.json()).then(function(response) {
 
 // Get average of recorded total
 function metadataAverage(state, field) {
-    let avgFieldName = "Average " + field;
+    let avgFieldName = "Avg " + field;
     stateData[state].metadata[avgFieldName] = Math.round(stateData[state].totals[field] / stateData[state].counts[field] * 100) / 100;
 }
 
@@ -67,25 +75,28 @@ function accumulateValue(state, field, addend) {
 
 // Add new marker
 function addMarker(report, state = defaultChoice) {
-    let location = report.location; // TODO: match JSON
-    let desc = report.descriptor; // TODO: match JSON
-    let year = report.created_date.substr(5,2); // TODO: match JSON
-    let season = report.descriptor; // TODO: match JSON
+    let lat = report.Latitude;
+    let long = report.Longitude;
+    let desc = report.Observed;
+    let num = report.Number;
+    let date = report.Date;
+    let year = date.substring(0,4);
+    let season = report.Season;
 
     // Add marker to markerClusterGroup
-    stateData[state].markers.addLayer(L.marker([location.coordinates[1], location.coordinates[0]]) // TODO: match JSON
-        .bindPopup(desc));
+    stateData[state].markers.addLayer(L.marker([lat, long])
+        .bindPopup(`<b>Report #${num}:</b> ${desc} <b>--${date}</b>`, {maxHeight: 300}));
 
     // Count sighting in relevant fields
     countSighting(state, "yearCounts", year);
     countSighting(state, "seasonCounts", season);
     stateData[state].metadata["Total Sightings"]++;
 
-    for (const field of fieldsToAverage) {
-        accumulateValue(state, field, Number(report[field.toLowerCase()])); // TODO: remove .toLowercase() if needed
+    for (const field of fieldList) {
+        accumulateValue(state, field, Number(report[field]));
     }
 
-    if (state === defaultChoice) addMarker(report, report.borough); // Woo recursion! // TODO: match JSON
+    if (state === defaultChoice) addMarker(report, report.State); // Woo recursion!
 }
 
 // Count sighting where appropriate
@@ -99,11 +110,11 @@ function newState(state) {
     stateData[state] = {
         markers: L.markerClusterGroup(),
         yearCounts: {},
-        seasonCounts: { // TODO: Change to actual seasons
-            "Rat Sighting": 0,
-            "Condition Attracting Rodents": 0,
-            "Mouse Sighting": 0,
-            "Signs of Rodents": 0
+        seasonCounts: {
+            "Spring": 0,
+            "Summer": 0,
+            "Fall": 0,
+            "Winter": 0
         },
         totals: {},
         counts: {},
@@ -121,7 +132,7 @@ function newState(state) {
         }]
     }
 
-    for (const field of fieldsToAverage) {
+    for (const field of fieldList) {
         stateData[state].totals[field] = 0;
         stateData[state].counts[field] = 0;
     }
@@ -185,6 +196,13 @@ function optionChanged(state) {
 
     // Metadata
     for (const [key, value] of Object.entries(stateData[state].metadata)) {
-        if (value) metadataPanel.append("div").text(`${key}: ${value}`);
+        let field = key.substring(4);
+        let unit = "";
+        if (fieldUnits[field]) unit = fieldUnits[field];
+        if (value) {
+            let stat = metadataPanel.append("div");
+            stat.append("b").text(`${key}: `);
+            stat.append().text(`${value} ${unit}`);
+        }
     }
 }
