@@ -26,7 +26,7 @@ Lastly, a statistics panel that will display the total number of sightings in th
 
 **Shortcomings:**
 
-Most bigfoot sightings happen when people are partaking in various outdoor activities, so the amount of bigfoot activity during weather conditions not ideal for humans is yet to be determined, and this data likely skews unfairly in favor of moderate weather conditions. The weather is calculated and based on the average weather for the day, so trying to coordinate a  bigfoot sighting based on weather would probably not be the way since weather temperature can vary throughout the day.
+Most bigfoot sightings happen when people are partaking in various outdoor activities, so the amount of bigfoot activity during weather conditions not ideal for humans is yet to be determined, and this data likely skews unfairly in favor of moderate weather conditions. The weather is calculated and based on the average weather for the day, so trying to coordinate a  bigfoot sighting based on weather would probably not be the best way since weather temperature can vary throughout the day.
 
 
 **Team Members:**
