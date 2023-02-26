@@ -12,7 +12,8 @@ The website displays a dropdown where the user can select a state to explore for
 
 The second visualization is a line graph that displays the number of sighting on the y axis and the year it was sighted on the x axis. 
 
-![1677399841407](image/README/1677399841407.png)
+![1677399841407](image/README/1677399841407.png)![bf line graph](https://user-images.githubusercontent.com/115592072/221435054-db38879b-3cf2-4f67-b161-58dd11694b6a.png)
+
 
 The third visualization is a cluster map. The latitude and longitude provided in the data is used to show the point of the sighting by zooming in or clicking on a specific cluster. Clicking on the point of sighting will also show a report number, the date of the sighting, and a detailed report of the sighting .
 
