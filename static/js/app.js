@@ -133,8 +133,8 @@ function optionChanged(stateName, state) {
     myMap.removeLayer(stateData[prevState].markers);
     prevState = stateName;
 
-    console.log(`${stateName}:`); // debug
-    console.log(state); // debug
+    //console.log(`${stateName}:`); // debug
+    //console.log(state); // debug
 
     myMap.addLayer(state.markers);
     myMap.fitBounds(state.markers.getBounds());
@@ -169,32 +169,26 @@ function optionChanged(stateName, state) {
             .text("No more than one visit per county");   
     else listHotspots(state);
 
-    let avgList = metaPanel.append("div");
-    avgList.append("b").text("Averages:");
-    let avgEntries = avgList.append("ul")
+    let avgDiv = metaPanel.append("div");
+    avgDiv.append("b").text("Averages:");
+    let avgList = avgDiv.append("ul")
     Object.entries(state.fieldAvgs).forEach(([key, value]) => {
-        let unit = fieldUnits[key];
         if (value) {
-            let stat = avgEntries.append("li");
+            let stat = avgList.append("li");
             stat.append("b").text(`${key}: `);
-            stat.append().text(`${value}${unit}`);
+            stat.append().text(`${value}${fieldUnits[key]}`);
         }
     });
 }
 
 // Display all the counties with the most Bigfoot visits for a given state
 function listHotspots(state) {
-    let hotspotList = metaPanel.append("div");
-    if (state.hotspots.length === 1) {
-        hotspotList.append("b").text("Most Visited County ");
-        hotspotList.append()
-            .text(`(${state.countyCounts[state.hotspots[0]]} visits)`);
-    } else {
-        hotspotList.append("b").text("Most Visited Counties ");
-        hotspotList.append()
-            .text(`(${state.countyCounts[state.hotspots[0]]} visits each)`);
-    }
-    hotspotList.append("b").text(":");
-    let countyEntries = hotspotList.append("ul");
-    state.hotspots.forEach(county => countyEntries.append("li").text(county));
+    let hotDiv = metaPanel.append("div");
+    let plural = (state.hotspots.length > 1 ? 1 : 0);
+    let maxVisits = state.countyCounts[state.hotspots[0]];
+    hotDiv.append("b").text(`Most Visited Count${plural ? "ies" : "y"} `);
+    hotDiv.append().text(`(${maxVisits} visits${plural ? " each" : ""})`);
+    hotDiv.append("b").text(":");
+    let hotspotList = hotDiv.append("ul");
+    state.hotspots.forEach(county => hotspotList.append("li").text(county));
 }
