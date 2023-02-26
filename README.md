@@ -1,4 +1,5 @@
-# big_foot_data_analysis
+# Project 3: big_foot_data_analysis
+
 Where does bigfoot venture?
 
  In this project, we have created an interface that allows user interactivity to query  bigfoot sightings across the continental US.
