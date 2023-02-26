@@ -1,4 +1,4 @@
-const metadataPanel = d3.select("#state-metadata");
+const metaPanel = d3.select("#state-metadata");
 const fieldUnits = {
     "Temperature": " °F",
     "Precip_intensity": " in/hr",
@@ -13,234 +13,188 @@ const defaultChoice = "All States";
 let prevState = defaultChoice;
 let stateData = {};
 let myMap = L.map("map");
-  
-// Adding the tile layer
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">\
+        OpenStreetMap</a> contributors'
 }).addTo(myMap);
 
-/////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 
 // query API, perform initial setup
-fetch("/data").then((response) => response.json()).then(function(response) {
+fetch("/data").then(response => response.json())
+    .then(response => init(response));
+
+// Initial setup
+function init(response) {
     newState(defaultChoice);
 
-    console.log(response[0]); // debug
+    //console.log(response[0]); // debug
   
-    // Loop through the data
-    for (const report of response) {
+    response.forEach(report => {
         let state = report.State;
-  
-        // Only mark reports with useful info
         if (report.Latitude && report.Longitude && report.Observed) {
             if (!stateData[state]) newState(state);
             addMarker(report);
         }
-    }
+    });
 
-    // Alphabetize list, keeping the default at the top
+    // Alphabetize list, keeping the default at the top, for dropdown order
     let stateList = Object.keys(stateData).sort();
     stateList.unshift(stateList.splice(stateList.indexOf(defaultChoice), 1)[0]);
 
-    // Give each location chart data and dropdown entry, calculate averages
-    for (const state of stateList) {
-        if (stateData[state].seasonCounts.Unknown) delete stateData[state].seasonCounts.Unknown; // TODO: remove if new JSON doesn't need this
-        stateData[state].bar[0].x = Object.keys(stateData[state].seasonCounts);
-        stateData[state].bar[0].y = Object.values(stateData[state].seasonCounts);
+    // Fill out stateData and build dropdown menu
+    stateList.forEach(state => stateSetup(state, stateData[state]));
 
-        stateData[state].line[0].x = Object.keys(stateData[state].yearCounts).sort();
-        stateData[state].line[0].y = stateData[state].line[0].x.map(index => stateData[state].yearCounts[index]);
-
-        dropdown.append("option").attr("value", state).text(state);
-
-        for (const field of fieldList) calcAverages(state, field);
-        stateData[state].fieldAverages.Cloud_cover = Math.round(stateData[state].fieldAverages.Cloud_cover * 100); // TODO: remove if new JSON doesn't need this
-        stateData[state].fieldAverages.Humidity = Math.round(stateData[state].fieldAverages.Humidity * 100); // TODO: remove if new JSON doesn't need this
-
-        countyMax(state);
-    }
-
-    // Initialize graphics with first item in dropdown menu
-    optionChanged(dropdown.select("option").attr("value"));
-});
-
-// Get average of recorded total, to two decimal places
-function calcAverages(state, field) {
-    stateData[state].fieldAverages[field] = Math.round(stateData[state].fieldTotals[field] / stateData[state].fieldCounts[field] * 100) / 100;
+    let firstItem = dropdown.select("option").attr("value");
+    optionChanged(firstItem, stateData[firstItem]);
 }
 
-// Add given value to total for given field
-function accumulateValue(state, field, addend) {
-    stateData[state].fieldTotals[field] += addend;
-    stateData[state].fieldCounts[field]++;
-}
-
-// Add new marker
-function addMarker(report, state = defaultChoice) {
-    let lat = report.Latitude;
-    let long = report.Longitude;
-    let desc = report.Observed;
-    let num = report.Number;
-    let date = report.Date;
-    let year = date.substring(0,4);
-    let season = report.Season;
-    let county = report.County;
-
-    // Add marker to markerClusterGroup
-    stateData[state].markers.addLayer(L.marker([lat, long])
-        .bindPopup(`<b>Report #${num}:</b> ${desc} <b>--${date}</b>`, {maxHeight: 300}));
-
-    // Count sighting in relevant fields
-    countSighting(state, "yearCounts", year);
-    countSighting(state, "seasonCounts", season);
-    countSighting(state, "countyCounts", county);
-    stateData[state].totalSightings++;
-
-    for (const field of fieldList) {
-        accumulateValue(state, field, Number(report[field]));
-    }
-
-    if (state === defaultChoice) addMarker(report, report.State); // Woo recursion!
-}
-
-// Count sighting where appropriate
-function countSighting(state, field, subfield) {
-    if (!stateData[state][field][subfield]) stateData[state][field][subfield] = 0;
-    stateData[state][field][subfield]++;
-}
-
-// Get an array of counties with the highest number of Bigfoot sightings
-// Source: https://stackoverflow.com/a/47934466/20258097
-function countyMax(state) {
-    let countyList = stateData[state].countyCounts;
-    stateData[state].densestCounties = Object.keys(countyList).filter(x => {
-         return countyList[x] == Math.max.apply(null, 
-         Object.values(countyList));
-   });
-};
-
-// Set up new state with markers, metadata, etc.
 function newState(state) {
     stateData[state] = {
         markers: L.markerClusterGroup(),
-        yearCounts: {},
-        seasonCounts: {
-            "Spring": 0,
-            "Summer": 0,
-            "Fall": 0,
-            "Winter": 0
-        },
-        countyCounts: {},
-        fieldTotals: {},
-        fieldCounts: {},
+        seasonCounts: {Spring: 0, Summer: 0, Fall: 0, Winter: 0},
         totalSightings: 0,
-        densestCounties: [],
-        fieldAverages: {},
-        bar: [{
-            type: "bar",
-            x: [],
-            y: []
-        }],
-        line: [{
-            x: [],
-            y: []
-        }]
+        hotspots: [],
+        bar: [{type: "bar", x: [], y: []}],
+        line: [{x: [], y: []}]
     }
 
-    for (const field of fieldList) {
-        stateData[state].fieldTotals[field] = 0;
+    let objKeys = ["yearCounts", "countyCounts",
+        "fieldCounts", "fieldTotals", "fieldAvgs"];
+    objKeys.forEach(key => stateData[state][key] = {});
+
+    fieldList.forEach(field => {
         stateData[state].fieldCounts[field] = 0;
-    }
+        stateData[state].fieldTotals[field] = 0
+    });
+}
+
+function addMarker(report, state = stateData[defaultChoice]) {
+    popText = `<b>${report.Date}, Report #${report.Number}:</b>
+        </br>${report.Observed}`;
+    state.markers.addLayer(L.marker([report.Latitude, report.Longitude])
+        .bindPopup(popText, {maxHeight: 300}));
+
+    countVisit(state, "yearCounts", report.Date.substring(0,4));
+    countVisit(state, "seasonCounts", report.Season);
+    countVisit(state, "countyCounts", report.County);
+    state.totalSightings++;
+
+    fieldList.forEach(field =>
+        accumulateValue(state, field, Number(report[field])));
+
+    if (state === stateData[defaultChoice])
+        addMarker(report, stateData[report.State]); // Woo recursion!
+}
+
+function countVisit(state, field, subfield) {
+    if (!state[field][subfield]) state[field][subfield] = 0;
+    state[field][subfield]++;
+}
+
+function accumulateValue(state, field, addend) {
+    state.fieldTotals[field] += addend;
+    state.fieldCounts[field]++;
+}
+
+// Set up chart parameters, dropdown option, and metadata tidbits
+function stateSetup(stateName, state) {
+    state.bar[0].x = Object.keys(state.seasonCounts);
+    state.bar[0].y = Object.values(state.seasonCounts);
+
+    state.line[0].x = Object.keys(state.yearCounts).sort();
+    state.line[0].y = state.line[0].x.map(index => state.yearCounts[index]);
+
+    dropdown.append("option").attr("value", stateName).text(stateName);
+
+    countyMax(state);
+    fieldList.forEach(field => {
+        calcAvgs(state, field);
+        if (fieldUnits[field] === "%")
+            state.fieldAvgs[field] = Math.round(state.fieldAvgs[field] * 100);
+    });
+}
+
+function countyMax(state) {
+    let counties = state.countyCounts;
+    state.hotspots = Object.keys(counties).filter(county => {
+        return counties[county] === Math.max(...Object.values(counties));
+    });
+};
+
+function calcAvgs(state, field) {
+    let rawAvg = state.fieldTotals[field] / state.fieldCounts[field];
+    state.fieldAvgs[field] = Math.round(rawAvg * 100) / 100;
 }
 
 // Update page on dropdown selection
-function optionChanged(state) {
-    // Clear old stuff
-    metadataPanel.selectAll("div").remove();
+function optionChanged(stateName, state) {
+    metaPanel.selectAll("div").remove();
     myMap.removeLayer(stateData[prevState].markers);
-    prevState = state;
+    prevState = stateName;
 
-    console.log(`${state}:`); // debug
-    console.log(stateData[state]); // debug
+    console.log(`${stateName}:`); // debug
+    console.log(state); // debug
 
-    // Map stuff
-    myMap.addLayer(stateData[state].markers);
-    myMap.fitBounds(stateData[state].markers.getBounds());
+    myMap.addLayer(state.markers);
+    myMap.fitBounds(state.markers.getBounds());
 
-    // Bar chart
     let barLayout = {
         title: {
-            text: `Bigfoot Sightings Per<br>Season In ${state}`,
-            font: {
-                size: 20
-            }
+            text: `Bigfoot Sightings Per<br>Season In ${stateName}`,
+            font: {size: 20}
         },
-        xaxis: {
-            title: {
-                text: "Season"
-            }
-        },
-        yaxis: {
-            title: {
-                text: "Number of Sightings"
-            }
-        }
+        xaxis: {title: {text: "Season"}},
+        yaxis: {title: {text: "Number of Sightings"}}
     }
-    Plotly.newPlot("bar", stateData[state].bar, barLayout);
+    Plotly.newPlot("bar", state.bar, barLayout);
 
-    // Line chart
     let lineLayout = {
         title: {
-            text: `Bigfoot Sightings Over<br>Time In ${state}`,
-            font: {
-                size: 20
-            }
+            text: `Bigfoot Sightings Over<br>Time In ${stateName}`,
+            font: {size: 20}
         },
-        xaxis: {
-            title: {
-                text: "Year"
-            }
-        },
-        yaxis: {
-            title: {
-                text: "Number of Sightings"
-            }
-        }
+        xaxis: {title: {text: "Year"}},
+        yaxis: {title: {text: "Number of Sightings"}}
     }
-    Plotly.newPlot("line", stateData[state].line, lineLayout);
+    Plotly.newPlot("line", state.line, lineLayout);
 
     // Metadata
-    let metaTotal = metadataPanel.append("div");
-    metaTotal.append("b").text("Total Sightings: ");
-    metaTotal.append().text(stateData[state].totalSightings);
+    let totalListing = metaPanel.append("div");
+    totalListing.append("b").text("Total Sightings: ");
+    totalListing.append().text(state.totalSightings);
 
-    // Most visited county
-    if (stateData[state].countyCounts[stateData[state].densestCounties[0]] === 1) {
-        metadataPanel.append("div").append("b").text("No more than one visit per county");
-    } else {
-        let metaDense = metadataPanel.append("div");
-        if (stateData[state].densestCounties.length === 1) {
-            metaDense.append("b").text("Most Visited County ");
-            metaDense.append().text(`(${stateData[state].countyCounts[stateData[state].densestCounties[0]]} visits)`);
-        } else {
-            metaDense.append("b").text("Most Visited Counties ");
-            metaDense.append().text(`(${stateData[state].countyCounts[stateData[state].densestCounties[0]]} visits each)`);
-        }
-        metaDense.append("b").text(":");
-        let countyEntries = metaDense.append("ul");
-        for (const county of stateData[state].densestCounties) countyEntries.append("li").text(county);
-    }
+    if (state.countyCounts[state.hotspots[0]] === 1)
+        metaPanel.append("div").append("b")
+            .text("No more than one visit per county");   
+    else listHotspots(state);
 
-    // Averages
-    let avgList = metadataPanel.append("div");
+    let avgList = metaPanel.append("div");
     avgList.append("b").text("Averages:");
     let avgEntries = avgList.append("ul")
-    for (const [key, value] of Object.entries(stateData[state].fieldAverages)) {
+    Object.entries(state.fieldAvgs).forEach(([key, value]) => {
         let unit = fieldUnits[key];
         if (value) {
             let stat = avgEntries.append("li");
             stat.append("b").text(`${key}: `);
             stat.append().text(`${value}${unit}`);
         }
+    });
+}
+
+// Display all the counties with the most Bigfoot visits for a given state
+function listHotspots(state) {
+    let hotspotList = metaPanel.append("div");
+    if (state.hotspots.length === 1) {
+        hotspotList.append("b").text("Most Visited County ");
+        hotspotList.append()
+            .text(`(${state.countyCounts[state.hotspots[0]]} visits)`);
+    } else {
+        hotspotList.append("b").text("Most Visited Counties ");
+        hotspotList.append()
+            .text(`(${state.countyCounts[state.hotspots[0]]} visits each)`);
     }
+    hotspotList.append("b").text(":");
+    let countyEntries = hotspotList.append("ul");
+    state.hotspots.forEach(county => countyEntries.append("li").text(county));
 }
